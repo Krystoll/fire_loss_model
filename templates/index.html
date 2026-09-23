@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔥 Модели и методы определения ущерба от пожаров</title>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+    <!-- Собственные стили -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <!-- Плавающие искры -->
+    <div class="spark" style="left: 10%; animation-duration: 12s; animation-delay: 0s;"></div>
+    <div class="spark" style="left: 25%; animation-duration: 15s; animation-delay: 2s;"></div>
+    <div class="spark" style="left: 45%; animation-duration: 10s; animation-delay: 4s;"></div>
+    <div class="spark" style="left: 65%; animation-duration: 14s; animation-delay: 1s;"></div>
+    <div class="spark" style="left: 80%; animation-duration: 11s; animation-delay: 3s;"></div>
+    <div class="spark" style="left: 92%; animation-duration: 13s; animation-delay: 5s;"></div>
+
+    <!-- Оверлей загрузки -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loader"></div>
+        <p>Идёт расчёт модели...</p>
+    </div>
+
+    <!-- HEADER -->
+    <header>
+        <h1>🔥 Модели и методы определения ущерба от пожаров</h1>
+        <p>Системно-динамическая модель оценки потерь от пожаров в зданиях и лесных массивах</p>
+        <button type="button" onclick="randomizeAllValues()" class="btn btn-random-all">
+            <i class="fas fa-dice"></i> Случайные значения для всех параметров
+        </button>
+    </header>
+
+    <div class="container">
+        <form method="post" id="main-form">
+            <div class="columns-container">
+
+                <!-- ЛЕВАЯ КОЛОНКА -->
+                <div class="column">
+
+                    <!-- Начальные условия -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">
+                                <span class="card-icon"><i class="fas fa-fire"></i></span>
+                                Начальные потери
+                            </h2>
+                        </div>
+                        <div class="scrollable-section">
+                            {% for key, attr in v0.items() %}
+                            <div class="coefficient-item">
+                                <label><b>{{ key }}</b> — {{ attr.name }}</label>
+                                <input type="text" name="v0_{{ key }}" value="{{ attr.value }}" class="randomizable">
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Коэффициенты нормализации -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">
+                                <span class="card-icon"><i class="fas fa-balance-scale"></i></span>
+                                Коэффициенты нормализации
+                            </h2>
+                        </div>
+                        <div class="scrollable-section">
+                            {% for key, attr in c.items() %}
+                            <div class="coefficient-item">
+                                <label><b>{{ key }}</b> — {{ attr.name }}</label>
+                                <input type="text" name="c_{{ key }}" value="{{ attr.value }}" class="randomizable">
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- ПРАВАЯ КОЛОНКА -->
+                <div class="column">
+
+                    <!-- Вспомогательные функции -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">
+                                <span class="card-icon"><i class="fas fa-square-root-variable"></i></span>
+                                Вспомогательные функции модели
+                            </h2>
+                        </div>
+                        <div class="scrollable-section">
+                            {% for key, func in f.items() %}
+                            <div class="function-row">
+                                {% set func_num = key.split('_')[1] %}
+                                {% set var_num = func.L.split('_')[1] if '_' in func.L else func.L %}
+                                <span class="function-name"><b>Cf{{ func_num }}·(C{{ var_num }}) =</b></span>
+                                <input type="text" name="f_{{ key }}_a" value="{{ func.a }}" class="function-input randomizable">
+                                <span>·C{{ var_num }}³ +</span>
+                                <input type="text" name="f_{{ key }}_b" value="{{ func.b }}" class="function-input randomizable">
+                                <span>·C{{ var_num }}² +</span>
+                                <input type="text" name="f_{{ key }}_c" value="{{ func.c }}" class="function-input randomizable">
+                                <span>·C{{ var_num }} +</span>
+                                <input type="text" name="f_{{ key }}_d" value="{{ func.d }}" class="function-input randomizable">
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Возмущения -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">
+                                <span class="card-icon"><i class="fas fa-wind"></i></span>
+                                Возмущающие воздействия
+                            </h2>
+                        </div>
+                        <div class="scrollable-section">
+                            {% for key, func in z.items() %}
+                            <div class="coefficient-item perturbation-item">
+                                <label class="perturbation-label">
+                                    <b>{{ key }}</b> — {{ func.N }}
+                                </label>
+                                <div class="perturbation-formula">
+                                    <span class="formula-text">{{ key }} =</span>
+                                    <input type="text" name="z_{{ key }}_g" value="{{ func.g }}" class="randomizable function-input">
+                                    <span>·t³ +</span>
+                                    <input type="text" name="z_{{ key }}_b" value="{{ func.b }}" class="randomizable function-input">
+                                    <span>·t² +</span>
+                                    <input type="text" name="z_{{ key }}_m" value="{{ func.m }}" class="randomizable function-input">
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Кнопка расчёта -->
+            <div class="card card-cta">
+                <div class="button-group">
+                    <button type="submit" class="btn btn-primary btn-full btn-large">
+                        <i class="fas fa-calculator"></i> Рассчитать потери от пожаров
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        <!-- Форма полярных графиков -->
+        <form id="polarPlotForm" method="POST" action="/polar_plot" class="polar-form">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="card-icon"><i class="fas fa-chart-pie"></i></span>
+                        Экологические нормативы для потерь
+                    </h2>
+                </div>
+
+                <div class="scrollable-section scrollable-section-full">
+                    {% set norm_bounds = norm_bounds or [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0] %}
+                    <div class="norms-grid">
+                        {% for i in range(14) %}
+                        <div class="norm-item">
+                            <label for="norm_bound_{{ i }}">Норма Cf{{ i + 1 }}</label>
+                            <input type="number" id="norm_bound_{{ i }}" name="norm_bound_{{ i }}"
+                                   step="0.01" value="{{ norm_bounds[i] }}"
+                                   class="randomizable" required>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="button-group">
+                        <button type="submit" class="btn btn-success btn-full btn-large">
+                            <i class="fas fa-chart-line"></i> Построить полярные графики по всем временным точкам
+                        </button>
+                    </div>
+
+                    <div class="info-block">
+                        <i class="fas fa-circle-info"></i>
+                        <div>
+                            Будет построено <b>10 полярных диаграмм</b> для временных точек:
+                            <b>t = 0.1, 0.2, ..., 1.0</b>. Синяя линия — текущие потери,
+                            красный пунктир — экологические нормативы.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        <!-- FOOTER -->
+        <footer class="footer">
+            <p class="footer-course">
+                <i class="fas fa-graduation-cap"></i>
+                Практическая работа по курсу «Теория информационных процессов и систем»
+            </p>
+            <p class="footer-authors">
+                Фролов Егор Игоревич · Генералов Илья Алексеевич ·
+                Жумагалиев Султан Талгатович · Алтемиров Рахман Тагирович
+            </p>
+            <p class="footer-meta">
+                Тема: «Модели и методы определения ущерба от пожаров»
+            </p>
+            <p class="footer-meta">
+                СГТУ им. Гагарина Ю.А. · 2026
+            </p>
+        </footer>
+    </div>
+
+    <!-- Собственный скрипт -->
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
